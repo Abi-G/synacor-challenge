@@ -1,4 +1,5 @@
 import struct
+import pickle
 
 DEBUG = False
 
@@ -123,8 +124,26 @@ class CPU():
 
     def inn(self, a):
         if not self.buffer:
-            print("> ", end="")
-            self.buffer = input() + "\n"
+            while True:
+                print("> ", end="")
+                v = input()
+                if v == "save":
+                    print("To save type 'save <filename>'")
+                    continue
+                if v.startswith("save "):
+                    splt = v.split()
+                    if len(splt) == 2:
+                        path = splt[1]
+                        # Set buffer to "look" so on resume, get useful message
+                        self.buffer = "look\n"
+                        self.reg[a] = ord(self.buffer[0])
+                        self.buffer = self.buffer[1:]
+                        self.save(path)
+                    else:
+                        print("To save type 'save <filename>'")
+                else:
+                    self.buffer = v + "\n"
+                    break
         self.reg[a] = ord(self.buffer[0])
         self.buffer = self.buffer[1:]
 
@@ -165,6 +184,15 @@ class CPU():
         print("Local memory range: ", self.mem[start:stop])
         print("Registers: ", self.reg)
         print("Stack: ", self.stack)
+
+    def save(self, path):
+        pickle.dump(self, open(path, "wb"))
+        print("File saved")
+
+
+def load(filename):
+    cpu = pickle.load(open(filename, "rb"))
+    return cpu
 
 
 def dbg_print(*msgs):
