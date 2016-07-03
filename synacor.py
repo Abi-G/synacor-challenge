@@ -1,5 +1,6 @@
 import struct
 import pickle
+import argparse
 
 DEBUG = False
 
@@ -48,6 +49,31 @@ class CPU():
             19: (self.out, 1, "r"),
             20: (self.inn, 1, "w"),
             21: (self.noop, 0, "r")
+        }
+
+        self.opcode_meta = {
+            0: ("HALT", 0, "r"),
+            1: ("SET", 2, "w"),
+            2: ("PUSH", 1, "r"),
+            3: ("POP", 1, "w"),
+            4: ("EQ", 3, "w"),
+            5: ("GT", 3, "w"),
+            6: ("JMP", 1, "r"),
+            7: ("JT", 2, "r"),
+            8: ("JF", 2, "r"),
+            9: ("ADD", 3, "w"),
+            10: ("MULT", 3, "w"),
+            11: ("MOD", 3, "w"),
+            12: ("AND", 3, "w"),
+            13: ("OR", 3, "w"),
+            14: ("NOT", 2, "w"),
+            15: ("RMEM", 2, "w"),
+            16: ("WMEM", 2, "r"),
+            17: ("CALL", 1, "r"),
+            18: ("RET", 0, "r"),
+            19: ("OUT", 1, "r"),
+            20: ("IN", 1, "w"),
+            21: ("NOOP", 0, "r")
         }
 
     def sett(self, a, b):
@@ -167,6 +193,28 @@ class CPU():
             args.append(arg)
         func(*args)
 
+    def disasm(self):
+        while True:
+            ptr = self.codeptr
+            try:
+                opcode = self.bump()
+            except IndexError:
+                break
+            try:
+                (instr, nargs, rw) = self.opcode_meta[opcode]
+            except KeyError:
+                (instr, nargs, rw) = ("UNK", 0, "r")
+            args = []
+            for ix in range(nargs):
+                arg = self.bump()
+                if (32768 <= arg <= 32775):
+                    arg = arg - 32768
+                    if not (ix == 0 and rw == "w"):
+                        arg = self.reg[arg]
+                args.append(arg)
+            print(ptr, instr, args)
+
+
     def run(self):
         while True:
             opcode = self.bump()
@@ -200,9 +248,23 @@ def dbg_print(*msgs):
         print(*msgs)
 
 
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--filename", help="load memory state")
+    parser.add_argument("--disasm", action="store_true", help="activate disassembler")
+    return parser.parse_args()
+
+
 def main():
-    cpu = CPU("challenge.bin")
-    cpu.run()
+    args = parse_args()
+    if not args.filename:
+        cpu = CPU("challenge.bin")
+    else:
+        cpu = load(args.filename)
+    if args.disasm:
+        cpu.disasm()
+    else:
+        cpu.run()
 
 
 if __name__ == "__main__":

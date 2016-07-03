@@ -1,3 +1,5 @@
 *.pyc
 arch-spec
 challenge.bin
+*.p
+notes.md
