@@ -2,10 +2,9 @@ import struct
 import pickle
 import argparse
 
-DEBUG = False
-
 
 class CPU():
+
     def __init__(self, bin_file):
         self.mem = [0] * (1 << 15)
         self.stack = []
@@ -181,8 +180,7 @@ class CPU():
         self.codeptr += 1
         return opcode
 
-    def eval(self, opcode):
-        (func, nargs, rw) = self.opcodes[opcode]
+    def fetch_args(self, nargs, rw):
         args = []
         for ix in range(nargs):
             arg = self.bump()
@@ -191,7 +189,7 @@ class CPU():
                 if not (ix == 0 and rw == "w"):
                     arg = self.reg[arg]
             args.append(arg)
-        func(*args)
+        return args
 
     def disasm(self):
         while True:
@@ -204,26 +202,17 @@ class CPU():
                 (instr, nargs, rw) = self.opcode_meta[opcode]
             except KeyError:
                 (instr, nargs, rw) = ("UNK", 0, "r")
-            args = []
-            for ix in range(nargs):
-                arg = self.bump()
-                if (32768 <= arg <= 32775):
-                    arg = arg - 32768
-                    if not (ix == 0 and rw == "w"):
-                        arg = self.reg[arg]
-                args.append(arg)
+            args = self.fetch_args(nargs, rw)
             print(ptr, instr, args)
-
 
     def run(self):
         while True:
             opcode = self.bump()
-            dbg_print("ptr2", self.codeptr)
-            dbg_print("opcode:", opcode)
             if opcode == 0:     # Shortcircuit 'halt' opcode
                 break
-            self.eval(opcode)
-            dbg_print("ptr3", self.codeptr)
+            (func, nargs, rw) = self.opcodes[opcode]
+            args = self.fetch_args(nargs, rw)
+            func(*args)
 
     def display(self):
         print("Pointer at pos %d, val %d: " % (self.codeptr, self.mem[self.codeptr]))
@@ -241,11 +230,6 @@ class CPU():
 def load(filename):
     cpu = pickle.load(open(filename, "rb"))
     return cpu
-
-
-def dbg_print(*msgs):
-    if DEBUG:
-        print(*msgs)
 
 
 def parse_args():
