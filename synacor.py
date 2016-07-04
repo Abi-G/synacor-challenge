@@ -227,24 +227,102 @@ class CPU():
         print("File saved")
 
 
-def load(filename):
+class DebugCPU(CPU):
+
+    def __init__(self, bin_file):
+        self.debugstate = True
+        super().__init__(bin_file)
+        self.breakpts = []
+
+    def run(self):
+        while True:
+            opcode = self.bump()
+            if opcode == 0:     # Shortcircuit 'halt' opcode
+                break
+            (func, nargs, rw) = self.opcodes[opcode]
+            args = self.fetch_args(nargs, rw)
+            if self.debugstate or self.codeptr in self.breakpts:
+                self.pause(opcode, args)
+            func(*args)
+
+    def pause(self, opcode, args):
+        while True:
+            print("Paused. s: step, c: continue, b: breakpoint, d: display CPU state")
+            v = input()
+            if v == "s":
+                self.debugstate = True
+                break
+            elif v == "c":
+                self.debugstate = False
+                break
+            elif v.startswith("b "):
+                splt = v.split()
+                if len(splt) == 2:
+                    try:
+                        ipt = int(splt[1])
+                    except ValueError:
+                        print("Please enter numeric row no. after 'b'")
+                    if ipt > len(self.mem) or ipt < 0:
+                        print("Row entered is out of range. Please enter valid row no.")
+                    else:
+                        if ipt in self.breakpts:
+                            self.breakpts.remove(ipt)
+                            print("Breakpoint removed from loc %s" % ipt)
+                        else:
+                            self.breakpts.append(ipt)
+                            print("Breakpoint added at loc %s" % ipt)
+                else:
+                    print("Please specify only 1 breakpoint after 'b'")
+            elif v == "b":
+                print("Breakpoints: ", self.breakpts)
+            elif v == "d":
+                self.display()
+            else:
+                print("Invalid command")
+
+    def save(self, path):
+        cpu = CPU("challenge.bin")
+        copy_cpu(self, cpu)
+        cpu.save(path)
+
+
+def copy_cpu(cpu1, cpu2):
+    cpu2.stack = cpu1.stack
+    cpu2.reg = cpu1.reg
+    cpu2.mem = cpu1.mem
+    cpu2.codeptr = cpu1.codeptr
+    cpu2.buffer = cpu1.buffer
+
+
+def load(filename, debug):
     cpu = pickle.load(open(filename, "rb"))
-    return cpu
+    if debug:
+        dbg = DebugCPU("challenge.bin")
+        copy_cpu(cpu, dbg)
+        dbg.debugstate = True
+        return dbg
+    else:
+        return cpu
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--filename", help="load memory state")
     parser.add_argument("--disasm", action="store_true", help="activate disassembler")
+    parser.add_argument("--debug", action="store_true", help="activate debug mode")
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
     if not args.filename:
-        cpu = CPU("challenge.bin")
+        if args.debug:
+            cpu = DebugCPU("challenge.bin")
+        else:
+            cpu = CPU("challenge.bin")
     else:
-        cpu = load(args.filename)
+        cpu = load(args.filename, args.debug)
+
     if args.disasm:
         cpu.disasm()
     else:
